@@ -35,6 +35,10 @@ public class Slot {
         this.parkVehicle = parkVehicle;
     }
 
+    public String getVehicleNumber() {
+        return this.parkVehicle != null ? this.parkVehicle.getVehicleNumber() : null;
+    }
+
     public void vacateSlot() {
         this.parkVehicle = null;
         this.isEmpty = true;

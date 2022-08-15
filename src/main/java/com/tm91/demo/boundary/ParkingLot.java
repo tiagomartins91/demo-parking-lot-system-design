@@ -1,10 +1,12 @@
 package com.tm91.demo.boundary;
 
 import com.tm91.demo.control.Parking;
+import com.tm91.demo.control.ParkingChargeStrategy;
 import com.tm91.demo.entity.Slot;
 import com.tm91.demo.entity.Ticket;
 import com.tm91.demo.entity.Vehicle;
 import com.tm91.demo.entity.VehicleSize;
+import com.tm91.demo.exception.InvalidVehicleNumberException;
 import com.tm91.demo.exception.ParkingFullException;
 
 import java.util.ArrayList;
@@ -14,6 +16,8 @@ import java.util.List;
 public class ParkingLot implements Parking {
 
     private static ParkingLot parkingLot;
+
+    // TODO - Improve to use only one List<Slot> or just a class with capacity
     private final List<Slot> twoWheelerSlots;
     private final List<Slot> fourWheelerSlots;
 
@@ -68,6 +72,32 @@ public class ParkingLot implements Parking {
         return Ticket.of(nextAvailableSlot.getSlotNumber(), vehicle.getVehicleNumber(), new Date(), vehicle.getVehicleSize());
     }
 
+    public int unPark(Ticket ticket, ParkingChargeStrategy parkingCostStrategy) throws InvalidVehicleNumberException {
+        int costByHours;
+        Slot slot;
+
+        try {
+            if (ticket.getVehicleSize().equals(VehicleSize.FOUR_WHEELER)) {
+                slot = getFourWheelerSlotByVehicleNumber(ticket.getVehicleNumber());
+            } else {
+                slot = getTwoWheelerSlotByVehicleNumber(ticket.getVehicleNumber());
+            }
+
+            slot.vacateSlot();
+
+            int hours = getHoursParked(ticket.getDate(), new Date());
+            costByHours = parkingCostStrategy.getCharge(hours);
+
+            System.out.println("Vehicle with registration " + ticket.getVehicleNumber() + " at slot number " + slot.getSlotNumber()
+                    + " was parked for " + hours + " hours and the total charge is " + costByHours);
+        } catch (InvalidVehicleNumberException invalidVehicleNumber) {
+            System.out.println(invalidVehicleNumber.getMessage());
+            throw invalidVehicleNumber;
+        }
+
+        return costByHours;
+    }
+
     public void displayParkingStatus() {
         long availableFourWheelerSlots = fourWheelerSlots.stream()
                 .filter(Slot::isEmpty)
@@ -77,7 +107,7 @@ public class ParkingLot implements Parking {
                 .filter(Slot::isEmpty)
                 .count();
 
-        System.out.printf("Available four wheeler slots: %d, Available two wheeler slots: %d", availableFourWheelerSlots, availableTwoWheelerSlots);
+        System.out.printf("Parking status: Available four wheeler slots: %d, Available two wheeler slots: %d\n", availableFourWheelerSlots, availableTwoWheelerSlots);
     }
 
     private Slot getNextAvailableFourWheelerSlot() throws ParkingFullException {
@@ -92,5 +122,24 @@ public class ParkingLot implements Parking {
                 .filter(Slot::isEmpty)
                 .findFirst()
                 .orElseThrow(ParkingFullException::noEmptySlotsAvailable);
+    }
+
+    private Slot getFourWheelerSlotByVehicleNumber(String vehicleNumber) {
+        return fourWheelerSlots.stream()
+                .filter(slot -> slot.getVehicleNumber().equals(vehicleNumber))
+                .findFirst()
+                .orElseThrow(() -> new InvalidVehicleNumberException(vehicleNumber));
+    }
+
+    private Slot getTwoWheelerSlotByVehicleNumber(String vehicleNumber) {
+        return twoWheelerSlots.stream()
+                .filter(slot -> slot.getVehicleNumber().equals(vehicleNumber))
+                .findFirst()
+                .orElseThrow(() -> new InvalidVehicleNumberException(vehicleNumber));
+    }
+
+    private int getHoursParked(Date startDate, Date endDate) {
+        long secs = (endDate.getTime() - startDate.getTime()) / 1000;
+        return (int) (secs / 3600);
     }
 }
